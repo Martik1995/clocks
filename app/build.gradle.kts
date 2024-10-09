@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -64,6 +65,7 @@ dependencies {
     implementation(libs.okhttp3)
     implementation(libs.serialization.json)
     implementation(libs.serialization.converter)
+    implementation(libs.logging.interceptor)
 
     // DI
     implementation(libs.koin.android)

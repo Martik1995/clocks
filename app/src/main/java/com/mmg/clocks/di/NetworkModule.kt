@@ -1,11 +1,13 @@
 package com.mmg.clocks.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.mmg.clocks.data.network.Api
 import com.mmg.clocks.shared.network.CallAdapterFactory
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.dsl.module
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
@@ -17,7 +19,7 @@ private const val CONTENT_TYPE = "application/json"
 @OptIn(ExperimentalSerializationApi::class)
 val networkModule = module {
 
-    single {
+    single<Json> {
         Json {
             isLenient = true
             coerceInputValues = true
@@ -25,8 +27,13 @@ val networkModule = module {
         }
     }
 
-    single {
+    single<Retrofit> {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        }
+
         val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
             .connectTimeout(TIMEOUT_IN_SEC, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_IN_SEC, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_IN_SEC, TimeUnit.SECONDS)
@@ -39,4 +46,6 @@ val networkModule = module {
             .client(client)
             .build()
     }
+
+    single<Api> { get<Retrofit>().create(Api::class.java) }
 }

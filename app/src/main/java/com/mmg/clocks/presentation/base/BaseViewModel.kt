@@ -3,37 +3,51 @@ import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.lifecycle.viewModelScope
+import com.mmg.clocks.presentation.base.BaseEvent
+import com.mmg.clocks.presentation.base.BaseScreenState
+import com.mmg.clocks.shared.utils.launchWithCatch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
-abstract class BaseViewModel<DataState>  : ViewModel() {
+abstract class BaseViewModel<DataState> : ViewModel() {
 
-    private val _state: MutableState<ScreenState<DataState>> = mutableStateOf(ScreenState.Loading)
-    val state: State<ScreenState<DataState>> = _state
+    private val _state: MutableState<BaseScreenState<DataState>> = mutableStateOf(BaseScreenState.Loading)
+    val state: State<BaseScreenState<DataState>> = _state
 
     private var currentJob: Job? = null
 
-    fun onUIEvent(event: UIEvent) {
+    fun onUIEvent(event: BaseEvent) {
         reduce(event)
     }
 
+    /*
+    * Данный метод предназначен для инитиализации стейт объекта
+    * */
     protected abstract fun createDefaultDataState(): DataState
 
-    protected fun isLoading(): Boolean = _state.value is ScreenState.Loading
+    /*
+    * Возвращает состояние загрузки
+    * */
+    protected fun isLoading(): Boolean = _state.value is BaseScreenState.Loading
 
-    protected open fun reduce(event: UIEvent) {
-        // Handle UI events
+    protected open fun reduce(event: BaseEvent) {
+        // Отработка базовых ивентов (В данный момент он пуст!)
     }
 
-    protected fun updateData(work: (currentData: DataState) -> DataState) {
-        val currentData = (state.value as? ScreenState.Data)?.data ?: createDefaultDataState()
-        val newState = ScreenState.Data(work(currentData))
+    protected fun getStateData(): DataState {
+        return state.value.getResultData() ?: createDefaultDataState()
+    }
+
+    //Обновляет дата стейт объект используя текущий стейт объект, в случай если он пуст, вызывается createDefaultDataState()
+    protected fun updateDataWithState(work: (currentData: DataState) -> DataState) {
+        val currentData = (state.value as? BaseScreenState.Data)?.data ?: createDefaultDataState()
+        val newState = BaseScreenState.Data(work(currentData))
         _state.value = newState
     }
 
-    protected fun updateStateData(data: DataState) {
-        _state.value = ScreenState.Data(data)
+    //Обновляет дата стейт объект
+    protected fun updateData(newDataState: DataState) {
+        _state.value = BaseScreenState.Data(newDataState)
     }
 
     protected fun <WorkResult> createRequest(
@@ -46,32 +60,22 @@ abstract class BaseViewModel<DataState>  : ViewModel() {
         work: suspend CoroutineScope.(currentData: DataState) -> WorkResult,
         onLoading: () -> Unit,
         onData: (result: WorkResult, data: DataState) -> Unit,
-        onError: (reason: Throwable) -> Unit
+        onError: ((reason: Throwable) -> Unit)?
     ): Job {
         currentJob?.cancel()
-        return viewModelScope.launch {
-            onLoading()
-            try {
-                val result = work(state.value.getData() ?: createDefaultDataState())
-                onData(result, state.value.getData() ?: createDefaultDataState())
-            } catch (e: Throwable) {
-                onError(e)
-            }
-        }.also { currentJob = it }
+        return viewModelScope.launchWithCatch(
+            block = {
+                onLoading()
+                val result = work(getStateData())
+                onData(result, state.value.getResultData() ?: createDefaultDataState())
+            },
+            catch = { error ->
+                onError?.invoke(error)
+            }).also { currentJob = it }
     }
 
-    protected fun onErrorDefaultReaction(reason: Throwable) {
-        _state.value = ScreenState.Error(reason)
-    }
-
-    sealed class UIEvent
-
-    sealed class ScreenState<out T> {
-        data object Loading : ScreenState<Nothing>()
-        data class Data<out T>(val data: T) : ScreenState<T>()
-        data class Error(val reason: Throwable) : ScreenState<Nothing>()
-
-        fun getData(): T? = (this as? Data<T>)?.data
+    protected fun onErrorDefaultReaction(reason: Throwable, onRetryAction: () -> Unit) {
+        _state.value = BaseScreenState.Error(reason, onRetryAction)
     }
 
     protected class ViewModelRequest<DataState, WorkResult>(
@@ -79,11 +83,18 @@ abstract class BaseViewModel<DataState>  : ViewModel() {
         private val work: suspend CoroutineScope.(currentData: DataState) -> WorkResult
     ) {
         fun launch(
-            onLoading: () -> Unit,
-            onData: (result: WorkResult) -> Unit,
-            onError: (reason: Throwable) -> Unit
-        ): Job {
-            return viewModel.launchRequest(work, onLoading, { result, data -> onData(result) }, onError)
+            onError: (Throwable) -> Unit = {},
+            onLoading: () -> Unit = {
+                viewModel._state.value = BaseScreenState.Loading
+            },
+            onData: ((result: WorkResult) -> Unit)
+        ) {
+            viewModel.launchRequest(
+                work = work,
+                onLoading = onLoading,
+                onData = { result, _ -> onData(result) },
+                onError = onError
+            )
         }
     }
 }

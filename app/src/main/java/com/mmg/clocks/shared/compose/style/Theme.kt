@@ -1,4 +1,4 @@
-package com.mmg.clocks.shared.compose
+package com.mmg.clocks.shared.compose.style
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
