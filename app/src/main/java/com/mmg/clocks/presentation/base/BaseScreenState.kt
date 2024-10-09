@@ -1,25 +1,35 @@
 package com.mmg.clocks.presentation.base
 
-sealed class BaseScreenState<DataState: BaseDataState> {
-    abstract fun getScreenData(): DataState?
+/**
+ * Запеченная (sealed) классовая структура, представляющая состояния экрана.
+ * @param T Тип данных, который может быть представлен в состоянии данных.
+ */
+sealed class BaseScreenState<out T> {
 
-    data class Loading<DataState: BaseDataState>(
-        val data: DataState? = null
-    ): BaseScreenState<DataState>() {
-        override fun getScreenData(): DataState? = data
-    }
+    /**
+     * Состояние загрузки, указывающее на то, что данные в процессе получения.
+     */
+    object Loading : BaseScreenState<Nothing>()
 
-    data class Error<DataState: BaseDataState>(
-        val prevData: DataState? = null,
-        val reason: Throwable? = null,
-        val retryAction: () -> Unit
-    ): BaseScreenState<DataState>() {
-        override fun getScreenData(): DataState? = prevData
-    }
+    /**
+     * Состояние, представляющее успешно полученные данные.
+     *
+     * @param data Данные типа [T].
+     */
+    data class Data<out T>(val data: T) : BaseScreenState<T>()
 
-    data class Data<DataState: BaseDataState>(
-        val data: DataState
-    ): BaseScreenState<DataState>() {
-        override fun getScreenData(): DataState = data
-    }
+    /**
+     * Состояние ошибки, указывающее на проблему при получении данных.
+     *
+     * @param reason Причина ошибки, представленная объектом [Throwable].
+     * @param retryAction Лямбда-функция, которая будет вызвана для повторной попытки действия.
+     */
+    data class Error(val reason: Throwable, val retryAction: () -> Unit) : BaseScreenState<Nothing>()
+
+    /**
+     * Метод для получения данных из состояния.
+     *
+     * @return Данные типа [T] или null, если состояние не является [Data].
+     */
+    fun getResultData(): T? = (this as? Data<T>)?.data
 }

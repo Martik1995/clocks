@@ -7,8 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.mmg.clocks.presentation.screens.MainScreen
-import com.mmg.clocks.shared.compose.ClocksTheme
+import com.mmg.clocks.navigation.Screen
+import com.mmg.clocks.presentation.screens.cities.CitiesScreen
+import com.mmg.clocks.presentation.screens.main.MainScreen
+import com.mmg.clocks.shared.compose.style.ClocksTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,11 +21,9 @@ class MainActivity : ComponentActivity() {
 
                 val navController = rememberNavController()
 
-                NavHost(navController, startDestination = "start") {
-                    composable("start") { MainScreen(navController) }
-                    composable("details/{itemId}") { backStackEntry ->
-
-                    }
+                NavHost(navController, startDestination = Screen.Main.route) {
+                    composable(Screen.Main.route) { MainScreen(navController) }
+                    composable(Screen.Cities.route) { CitiesScreen(navController) }
                 }
             }
         }
